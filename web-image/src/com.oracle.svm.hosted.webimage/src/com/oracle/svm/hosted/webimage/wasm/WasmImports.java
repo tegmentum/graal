@@ -135,6 +135,17 @@ public class WasmImports {
                     TypeUse.withoutResult(i32, i32), "Print single char: (fd, char_code)");
 
     /**
+     * Print characters from a linear memory buffer.
+     * <p>
+     * Signature: {@code print_buffer(fd: i32, ptr: i32, num_chars: i32)}
+     * <p>
+     * Reads {@code num_chars} 16-bit characters starting at byte offset {@code ptr}
+     * in the module's linear memory. Used for batch printing in standalone WasmGC mode.
+     */
+    public static final ImportDescriptor.Function printBuffer = new ImportDescriptor.Function(MODULE_IO, "print_buffer",
+                    TypeUse.withoutResult(i32, i32, i32), "Print chars from linear memory buffer: (fd, ptr, num_chars)");
+
+    /**
      * Host flush: flush a file descriptor.
      * <p>
      * Signature: {@code host_flush(fd: i32)}
@@ -183,6 +194,8 @@ public class WasmImports {
         // IO functions (kebab-case)
         public static final ImportDescriptor.Function printChar = new ImportDescriptor.Function(COMPONENT_IO, "print-char",
                         TypeUse.withoutResult(i32, i32), "Print single char: (fd, char_code)");
+        public static final ImportDescriptor.Function printBuffer = new ImportDescriptor.Function(COMPONENT_IO, "print-buffer",
+                        TypeUse.withoutResult(i32, i32, i32), "Print chars from linear memory buffer: (fd, ptr, num_chars)");
         public static final ImportDescriptor.Function hostTimeMs = new ImportDescriptor.Function(COMPONENT_IO, "host-time-ms",
                         TypeUse.withResult(f64), "Host: current time in ms");
 

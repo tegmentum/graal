@@ -47,7 +47,10 @@ import com.oracle.svm.hosted.webimage.codegen.WebImageProviders;
 import com.oracle.svm.hosted.webimage.js.JSBody;
 import com.oracle.svm.hosted.webimage.js.JSKeyword;
 import com.oracle.svm.hosted.webimage.wasm.WasmJSCounterparts;
+import com.oracle.svm.hosted.webimage.wasm.ast.Export;
 import com.oracle.svm.hosted.webimage.wasm.ast.Instruction;
+import com.oracle.svm.hosted.webimage.wasm.ast.Limit;
+import com.oracle.svm.hosted.webimage.wasm.ast.Memory;
 import com.oracle.svm.hosted.webimage.wasm.ast.id.WasmId;
 import com.oracle.svm.hosted.webimage.wasm.ast.visitors.WasmElementCreator;
 import com.oracle.svm.hosted.webimage.wasm.ast.visitors.WasmRelocationVisitor;
@@ -91,6 +94,14 @@ public class WebImageWasmGCCodeGen extends WebImageWasmCodeGen {
     @Override
     protected void genWasmModule() {
         super.genWasmModule();
+
+        if (WebImageOptions.isStandaloneWasm()) {
+            // Add a 1-page (64KB) linear memory for batch printing buffer.
+            // WasmGC modules can have both GC types and linear memory.
+            WasmId.Memory memId = getProviders().idFactory().forMemory(0);
+            module.setMemory(new Memory(memId, Limit.fixed(1), "Batch printing buffer"));
+            module.addExport(new Export(Export.Type.MEM, memId, "memory", "Linear memory for host I/O"));
+        }
 
         for (Map.Entry<HostedMethod, String> entry : ((WebImageWasmGCCodeCache) codeCache).getExportedMethodMetadata().entrySet()) {
             HostedMethod m = entry.getKey();

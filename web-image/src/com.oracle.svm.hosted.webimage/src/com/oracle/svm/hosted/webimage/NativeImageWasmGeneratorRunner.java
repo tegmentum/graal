@@ -50,6 +50,7 @@ import com.oracle.svm.hosted.webimage.logging.visualization.VisualizationSupport
 import com.oracle.svm.hosted.webimage.name.WebImageNamingConvention;
 import com.oracle.svm.hosted.webimage.options.WebImageOptions;
 import com.oracle.svm.hosted.webimage.options.WebImageOptions.CompilerBackend;
+import com.oracle.svm.hosted.webimage.wasm.WebImageWasmOptions;
 import com.oracle.svm.hosted.webimage.util.BenchmarkLogger;
 import com.oracle.svm.hosted.webimage.wasm.WebImageWasmLMJavaMainSupport;
 import com.oracle.svm.hosted.webimage.wasmgc.WebImageWasmGCJavaMainSupport;
@@ -169,6 +170,12 @@ public class NativeImageWasmGeneratorRunner extends NativeImageGeneratorRunner {
             // In standalone mode, stack traces require JS (genBacktrace, formatStackTrace).
             // Force them off so the backtrace JSCallNodes are never emitted.
             optionProvider.getHostedValues().put(JSExceptionSupport.Options.DisableStackTraces, true);
+
+            // Use smaller heap init functions to stay within Cranelift's function size limit.
+            // The default (100K objects) produces functions too large for wasmtime to compile.
+            if (!optionProvider.getHostedValues().containsKey(WebImageWasmOptions.ImageHeapObjectsPerFunction)) {
+                optionProvider.getHostedValues().put(WebImageWasmOptions.ImageHeapObjectsPerFunction, 1000);
+            }
         }
 
         if (WebImageOptions.isNativeImageBackend()) {

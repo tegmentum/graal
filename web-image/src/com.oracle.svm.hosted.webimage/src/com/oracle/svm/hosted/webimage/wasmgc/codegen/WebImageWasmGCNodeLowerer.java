@@ -1006,8 +1006,16 @@ public class WebImageWasmGCNodeLowerer extends WebImageWasmNodeLowerer {
         } else if (descriptor == WasmGCCloneSupport.CLONE_TEMPLATE) {
             return new Instruction.Call(masm().getKnownIds().genericCloneTemplate.requestFunctionId(), args);
         } else if (descriptor == WasmGCJSConversion.EXTRACT_JS_NATIVE) {
+            if (WebImageOptions.isStandaloneWasm()) {
+                // JSValue native field access requires externref — return null ref in standalone
+                WasmRefType wasmExternType = (WasmRefType) masm().getWasmProviders().util().typeForJavaClass(WasmExtern.class);
+                return new Instruction.RefNull(wasmExternType);
+            }
             return new Instruction.Call(masm().getKnownIds().extractJSValueTemplate.requestGetterFunctionId(), args);
         } else if (descriptor == WasmGCJSConversion.SET_JS_NATIVE) {
+            if (WebImageOptions.isStandaloneWasm()) {
+                return new Instruction.Nop();
+            }
             return new Instruction.Call(masm().getKnownIds().extractJSValueTemplate.requestSetterFunctionId(), args);
         } else {
             return super.lowerWasmForeignCall(descriptor, args);

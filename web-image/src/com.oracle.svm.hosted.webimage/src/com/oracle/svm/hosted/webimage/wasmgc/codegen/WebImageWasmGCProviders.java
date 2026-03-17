@@ -91,6 +91,7 @@ public class WebImageWasmGCProviders extends WebImageWasmProviders {
 
         // IO imports
         factory.addImportRemapping(WasmImports.printChar, WasmImports.Component.printChar);
+        factory.addImportRemapping(WasmImports.printBuffer, WasmImports.Component.printBuffer);
         factory.addImportRemapping(WasmImports.hostTimeMs, WasmImports.Component.hostTimeMs);
 
         // WASI imports
