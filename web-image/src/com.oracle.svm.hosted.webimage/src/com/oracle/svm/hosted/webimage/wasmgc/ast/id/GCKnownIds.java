@@ -181,6 +181,8 @@ public class GCKnownIds extends KnownIds {
     public final WasmGCJSBodyTemplates.ExtractJSValue extractJSValueTemplate;
     public final WasmGCJSBodyTemplates.IsJavaObject isJavaObjectTemplate;
 
+    public final WasmGCFunctionTemplates.StandalonePrintChars standalonePrintCharsTemplate;
+
     private final List<Export> functionExports = new ArrayList<>();
 
     public GCKnownIds(WasmIdFactory idFactory) {
@@ -253,6 +255,8 @@ public class GCKnownIds extends KnownIds {
         this.extractJSValueTemplate = new WasmGCJSBodyTemplates.ExtractJSValue(idFactory);
         this.isJavaObjectTemplate = new WasmGCJSBodyTemplates.IsJavaObject(idFactory);
 
+        this.standalonePrintCharsTemplate = new WasmGCFunctionTemplates.StandalonePrintChars(idFactory);
+
         this.functionExports.add(Export.forFunction(unsafeCreateTemplate.requestFunctionId(), "unsafe.create", "Create uninitialized instance of given class"));
         this.functionExports.add(Export.forFunction(wrapExternTemplate.requestFunctionId(), "extern.wrap", "Wrap externref in WasmExtern"));
         this.functionExports.add(Export.forFunction(toExternTemplate.requestFunctionId(), "extern.unwrap", "Unwrap Java object to externref"));
@@ -305,7 +309,8 @@ public class GCKnownIds extends KnownIds {
                         fillHeapObjectTemplate,
                         fillHeapArrayTemplate,
                         objectCloneTemplate,
-                        arrayCloneTemplate);
+                        arrayCloneTemplate,
+                        standalonePrintCharsTemplate);
     }
 
     @Override

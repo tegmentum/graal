@@ -57,6 +57,7 @@ import com.oracle.svm.shared.option.ReplacingLocatableMultiOptionValue;
 import com.oracle.svm.util.AnnotatedObjectAccess;
 import com.oracle.svm.util.GuestAccess;
 import com.oracle.svm.util.JVMCIReflectionUtil;
+import com.oracle.svm.webimage.JSExceptionSupport;
 import com.oracle.svm.webimage.WebImageJSJavaMainSupport;
 import com.oracle.svm.webimage.WebImageJavaMainSupport;
 
@@ -162,6 +163,12 @@ public class NativeImageWasmGeneratorRunner extends NativeImageGeneratorRunner {
                 // is embedded) and the REDUCED mode makes the text file a lot easier to read
                 optionProvider.getHostedValues().put(WebImageOptions.NamingConvention, WebImageNamingConvention.NamingMode.REDUCED);
             }
+        }
+
+        if (backend == CompilerBackend.WASMGC && Boolean.TRUE.equals(optionProvider.getHostedValues().get(WebImageOptions.StandaloneWasm))) {
+            // In standalone mode, stack traces require JS (genBacktrace, formatStackTrace).
+            // Force them off so the backtrace JSCallNodes are never emitted.
+            optionProvider.getHostedValues().put(JSExceptionSupport.Options.DisableStackTraces, true);
         }
 
         if (WebImageOptions.isNativeImageBackend()) {

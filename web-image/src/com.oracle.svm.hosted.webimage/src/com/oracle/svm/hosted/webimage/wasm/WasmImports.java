@@ -124,6 +124,17 @@ public class WasmImports {
                     TypeUse.withoutResult(i32, i32, i32), "Host: print 2-byte chars to fd");
 
     /**
+     * Print a single character to a file descriptor.
+     * <p>
+     * Signature: {@code print_char(fd: i32, char_code: i32)}
+     * <p>
+     * Used by the WasmGC standalone backend where GC-managed arrays cannot be passed
+     * as linear memory pointers. Characters are sent one at a time.
+     */
+    public static final ImportDescriptor.Function printChar = new ImportDescriptor.Function(MODULE_IO, "print_char",
+                    TypeUse.withoutResult(i32, i32), "Print single char: (fd, char_code)");
+
+    /**
      * Host flush: flush a file descriptor.
      * <p>
      * Signature: {@code host_flush(fd: i32)}

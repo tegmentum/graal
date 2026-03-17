@@ -39,6 +39,7 @@ import com.oracle.svm.hosted.meta.HostedInstanceClass;
 import com.oracle.svm.hosted.meta.HostedMethod;
 import com.oracle.svm.hosted.meta.HostedType;
 import com.oracle.svm.hosted.webimage.name.WebImageNamingConvention;
+import com.oracle.svm.hosted.webimage.wasm.WasmImports;
 import com.oracle.svm.hosted.webimage.wasm.ast.Function;
 import com.oracle.svm.hosted.webimage.wasm.ast.FunctionTypeDescriptor;
 import com.oracle.svm.hosted.webimage.wasm.ast.Instruction;
@@ -1133,6 +1134,92 @@ public class WasmGCFunctionTemplates {
             WasmId.Local clazzParam = f.getParam(0);
 
             f.getInstructions().add(providers.builder().createUninitialized(clazzParam.getter()));
+            return f;
+        }
+    }
+
+    /**
+     * Function that prints a GC-managed char array to a file descriptor using per-character
+     * {@code io.print_char} imports.
+     * <p>
+     * This is used in standalone WASM mode where GC arrays cannot be passed as linear memory
+     * pointers to host functions. Instead, each character is read from the GC array and sent
+     * individually.
+     * <p>
+     * Generates:
+     *
+     * <pre>{@code
+     * (func $standalone.printChars (param $fd i32) (param $array (ref null $charArrayStruct))
+     *   (local $i i32)
+     *   (local $len i32)
+     *   (local.set $len (array.len (struct.get $charArrayStruct $inner $array)))
+     *   (block $break
+     *     (loop $loop
+     *       (br_if $break (i32.ge_u (local.get $i) (local.get $len)))
+     *       (call $io.print_char
+     *         (local.get $fd)
+     *         (array.get_u $charInnerArray (struct.get $charArrayStruct $inner $array) (local.get $i)))
+     *       (local.set $i (i32.add (local.get $i) (i32.const 1)))
+     *       (br $loop))))
+     * }</pre>
+     */
+    public static class StandalonePrintChars extends WasmFunctionTemplate.Singleton {
+
+        public StandalonePrintChars(WasmIdFactory idFactory) {
+            super(idFactory, true);
+        }
+
+        @Override
+        protected String getFunctionName() {
+            return "standalone.printChars";
+        }
+
+        @Override
+        protected Function createFunction(Context ctxt) {
+            WebImageWasmGCProviders providers = (WebImageWasmGCProviders) ctxt.getProviders();
+            GCKnownIds knownIds = providers.knownIds();
+
+            // char array struct type (nullable since the argument may be null)
+            WasmValType charArrayStructType = knownIds.getArrayStructType(JavaKind.Char).asNullable();
+
+            Function f = ctxt.createFunction(
+                            TypeUse.withoutResult(WasmPrimitiveType.i32, charArrayStructType),
+                            "Print char array to fd using per-character io.print_char");
+            Instructions instructions = f.getInstructions();
+
+            WasmId.Local fdParam = f.getParam(0);
+            WasmId.Local arrayParam = f.getParam(1);
+            WasmId.Local loopIndex = idFactory.newTemporaryVariable(WasmPrimitiveType.i32);
+            WasmId.Local arrayLength = idFactory.newTemporaryVariable(WasmPrimitiveType.i32);
+
+            // Get inner char array and its length
+            instructions.add(arrayLength.setter(providers.builder().getArrayLength(arrayParam.getter())));
+
+            // Loop: for each character, call print_char(fd, char_code)
+            WasmId.Label breakLabel = idFactory.newInternalLabel("break");
+            WasmId.Label loopLabel = idFactory.newInternalLabel("loop");
+
+            Instruction.Block block = new Instruction.Block(breakLabel);
+            instructions.add(block);
+
+            Instruction.Loop loop = new Instruction.Loop(loopLabel);
+            block.instructions.add(loop);
+
+            // Break if i >= len
+            loop.instructions.add(new Instruction.Break(breakLabel,
+                            Binary.Op.I32GeU.create(loopIndex.getter(), arrayLength.getter())));
+
+            // Call io.print_char(fd, array[i])
+            Instruction charValue = providers.builder().getArrayElement(arrayParam.getter(), loopIndex.getter(), JavaKind.Char);
+            WasmId.Func printCharImport = idFactory.forFunctionImport(WasmImports.printChar);
+            loop.instructions.add(new Instruction.Call(printCharImport, fdParam.getter(), charValue));
+
+            // i++
+            loop.instructions.add(loopIndex.setter(Binary.Op.I32Add.create(loopIndex.getter(), Instruction.Const.forInt(1))));
+
+            // Continue loop
+            loop.instructions.add(new Instruction.Break(loopLabel));
+
             return f;
         }
     }

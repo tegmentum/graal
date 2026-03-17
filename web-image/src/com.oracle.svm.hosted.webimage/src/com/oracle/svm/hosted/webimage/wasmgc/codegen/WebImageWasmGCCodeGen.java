@@ -41,6 +41,7 @@ import com.oracle.svm.hosted.webimage.WebImageCodeCache;
 import com.oracle.svm.hosted.webimage.WebImageHostedConfiguration;
 import com.oracle.svm.hosted.webimage.codegen.LowerableResource;
 import com.oracle.svm.hosted.webimage.codegen.LowerableResources;
+import com.oracle.svm.hosted.webimage.options.WebImageOptions;
 import com.oracle.svm.hosted.webimage.codegen.WebImageProviders;
 import com.oracle.svm.hosted.webimage.js.JSBody;
 import com.oracle.svm.hosted.webimage.js.JSKeyword;
@@ -157,8 +158,23 @@ public class WebImageWasmGCCodeGen extends WebImageWasmCodeGen {
 
     @Override
     protected void emitBootstrapDefinitions() {
+        if (WebImageOptions.isStandaloneWasm()) {
+            // In standalone mode, skip all JS bootstrap emissions.
+            // The WASM module runs without a JS host, so no JS imports or
+            // conversion code is needed.
+            return;
+        }
         super.emitBootstrapDefinitions();
         emitJSBodyImports();
+    }
+
+    @Override
+    protected void emitJSCode() {
+        if (WebImageOptions.isStandaloneWasm()) {
+            // In standalone mode, no JS host file is produced.
+            return;
+        }
+        super.emitJSCode();
     }
 
     /**
