@@ -39,6 +39,7 @@ import com.oracle.svm.hosted.meta.HostedInstanceClass;
 import com.oracle.svm.hosted.meta.HostedMethod;
 import com.oracle.svm.hosted.meta.HostedType;
 import com.oracle.svm.hosted.webimage.name.WebImageNamingConvention;
+import com.oracle.svm.hosted.webimage.options.WebImageOptions;
 import com.oracle.svm.hosted.webimage.wasm.WasmImports;
 import com.oracle.svm.hosted.webimage.wasm.ast.Function;
 import com.oracle.svm.hosted.webimage.wasm.ast.FunctionTypeDescriptor;
@@ -114,6 +115,16 @@ public class WasmGCFunctionTemplates {
         @Override
         protected Function createFunction(Context ctxt) {
             WebImageWasmGCProviders providers = (WebImageWasmGCProviders) ctxt.getProviders();
+
+            if (WebImageOptions.isStandaloneWasm()) {
+                // In standalone mode, produce a stub that returns i32(0) instead of externref.
+                // This function is dead code but must still be valid.
+                Function f = ctxt.createFunction(TypeUse.forUnary(WasmPrimitiveType.i32, providers.util().getJavaLangObjectType()),
+                                "Stub: extern.unwrap not available in standalone mode");
+                f.getInstructions().add(Instruction.Const.forInt(0));
+                return f;
+            }
+
             ResolvedJavaType wasmExternType = providers.getMetaAccess().lookupJavaType(WasmExtern.class);
             WasmId.StructType wasmExternId = idFactory.newJavaStruct(wasmExternType);
             WasmRefType wasmExternRef = wasmExternId.asNonNull();
@@ -162,9 +173,19 @@ public class WasmGCFunctionTemplates {
         protected Function createFunction(Context ctxt) {
             WebImageWasmGCProviders providers = (WebImageWasmGCProviders) ctxt.getProviders();
             WasmGCUtil util = providers.util();
+            WasmRefType javaLangObjectType = util.getJavaLangObjectType();
+
+            if (WebImageOptions.isStandaloneWasm()) {
+                // In standalone mode, produce a stub that takes i32 and returns null.
+                // This function is dead code but must still be valid.
+                Function f = ctxt.createFunction(TypeUse.forUnary(javaLangObjectType, WasmPrimitiveType.i32),
+                                "Stub: extern.wrap not available in standalone mode");
+                f.getInstructions().add(new Instruction.RefNull(javaLangObjectType));
+                return f;
+            }
+
             ResolvedJavaType wasmExternType = providers.getMetaAccess().lookupJavaType(WasmExtern.class);
             WasmId.StructType wasmExternId = idFactory.newJavaStruct(wasmExternType);
-            WasmRefType javaLangObjectType = util.getJavaLangObjectType();
 
             JavaConstant hubConstant = providers.getConstantReflection().asJavaClass(providers.getMetaAccess().lookupJavaType(WasmExtern.class));
 

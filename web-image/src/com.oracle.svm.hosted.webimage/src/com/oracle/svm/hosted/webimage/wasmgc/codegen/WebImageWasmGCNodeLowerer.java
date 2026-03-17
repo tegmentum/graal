@@ -969,8 +969,9 @@ public class WebImageWasmGCNodeLowerer extends WebImageWasmNodeLowerer {
     protected Instruction lowerWasmImportForeignCall(WasmImportForeignCallDescriptor descriptor, Instructions args) {
         if (WebImageOptions.isStandaloneWasm() && descriptor == WasmImports.PROXY_CHAR_ARRAY) {
             // In standalone mode, proxyCharArray (JS interop) is not available.
-            // Return a null externref since the caller just needs an opaque handle.
-            return new Instruction.RefNull(WasmRefType.EXTERNREF);
+            // Return a null WasmExtern ref (the caller just needs an opaque handle).
+            WasmRefType wasmExternType = (WasmRefType) masm().getWasmProviders().util().typeForJavaClass(WasmExtern.class);
+            return new Instruction.RefNull(wasmExternType);
         }
 
         Class<?>[] argTypes = descriptor.getArgumentTypes();

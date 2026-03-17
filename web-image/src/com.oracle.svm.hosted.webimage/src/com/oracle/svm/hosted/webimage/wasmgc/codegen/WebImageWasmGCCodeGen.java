@@ -42,6 +42,7 @@ import com.oracle.svm.hosted.webimage.WebImageHostedConfiguration;
 import com.oracle.svm.hosted.webimage.codegen.LowerableResource;
 import com.oracle.svm.hosted.webimage.codegen.LowerableResources;
 import com.oracle.svm.hosted.webimage.options.WebImageOptions;
+import com.oracle.svm.hosted.webimage.util.metrics.ImageMetricsCollector;
 import com.oracle.svm.hosted.webimage.codegen.WebImageProviders;
 import com.oracle.svm.hosted.webimage.js.JSBody;
 import com.oracle.svm.hosted.webimage.js.JSKeyword;
@@ -169,9 +170,14 @@ public class WebImageWasmGCCodeGen extends WebImageWasmCodeGen {
     }
 
     @Override
+    @SuppressWarnings("try")
     protected void emitJSCode() {
         if (WebImageOptions.isStandaloneWasm()) {
             // In standalone mode, no JS host file is produced.
+            // Still create the metrics scope so post-processing counters are initialized.
+            try (ImageMetricsCollector collector = new ImageMetricsCollector.PreClosure(codeBuffer)) {
+                // No JS code to emit.
+            }
             return;
         }
         super.emitJSCode();
