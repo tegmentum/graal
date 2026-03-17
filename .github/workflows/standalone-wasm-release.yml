@@ -1,0 +1,93 @@
+name: Build Standalone WASM Distribution
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release tag to attach artifacts to (e.g. v25.1.0-standalone-wasm-1)'
+        required: true
+        type: string
+
+jobs:
+  build:
+    name: Build web-image (${{ matrix.os }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - os: linux-x64
+            runner: ubuntu-22.04
+          - os: darwin-aarch64
+            runner: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up environment
+        run: |
+          echo "JAVA_HOME=${{ github.workspace }}/labsjdk" >> $GITHUB_ENV
+          echo "MX_PATH=${{ github.workspace }}/mx" >> $GITHUB_ENV
+          echo "MX_VERSION=$(jq -r '.mx_version' common.json)" >> $GITHUB_ENV
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.8'
+
+      - name: Checkout mx
+        uses: actions/checkout@v4
+        with:
+          repository: graalvm/mx
+          ref: ${{ env.MX_VERSION }}
+          path: ${{ env.MX_PATH }}
+
+      - name: Fetch LabsJDK
+        run: |
+          mkdir jdk-dl
+          ${MX_PATH}/mx --java-home= fetch-jdk --jdk-id labsjdk-ce-latest --to jdk-dl --alias ${JAVA_HOME}
+
+      - name: Build web-image
+        run: |
+          cd web-image
+          ${MX_PATH}/mx --java-home=${JAVA_HOME} build
+
+      - name: Locate GraalVM distribution
+        id: dist
+        run: |
+          cd web-image
+          GRAALVM_HOME=$(${MX_PATH}/mx --java-home=${JAVA_HOME} graalvm-home)
+          echo "graalvm_home=${GRAALVM_HOME}" >> $GITHUB_OUTPUT
+
+          # Determine the distribution root (one level up from Contents/Home on macOS)
+          if [[ "${{ matrix.os }}" == darwin-* ]]; then
+            DIST_ROOT=$(dirname $(dirname ${GRAALVM_HOME}))
+          else
+            DIST_ROOT=${GRAALVM_HOME}
+          fi
+          echo "dist_root=${DIST_ROOT}" >> $GITHUB_OUTPUT
+          echo "dist_name=$(basename ${DIST_ROOT})" >> $GITHUB_OUTPUT
+
+      - name: Verify web-image works
+        run: |
+          ${{ steps.dist.outputs.graalvm_home }}/bin/web-image --version || true
+          echo "public class Hello { public static void main(String[] args) {} }" > /tmp/Hello.java
+          ${JAVA_HOME}/bin/javac -d /tmp /tmp/Hello.java
+          ${{ steps.dist.outputs.graalvm_home }}/bin/web-image \
+            -H:+StandaloneWasm -H:Backend=WASMGC -H:-AutoRunVM \
+            -cp /tmp Hello -o /tmp/hello 2>&1 | tail -5
+
+      - name: Package distribution
+        id: package
+        run: |
+          ARTIFACT_NAME="graalvm-standalone-wasm-25.1.0-dev-${{ matrix.os }}.tar.gz"
+          DIST_ROOT="${{ steps.dist.outputs.dist_root }}"
+          tar czf ${ARTIFACT_NAME} -C "$(dirname ${DIST_ROOT})" "$(basename ${DIST_ROOT})"
+          echo "artifact_name=${ARTIFACT_NAME}" >> $GITHUB_OUTPUT
+          echo "artifact_size=$(du -h ${ARTIFACT_NAME} | cut -f1)" >> $GITHUB_OUTPUT
+
+      - name: Upload to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Uploading ${{ steps.package.outputs.artifact_name }} (${{ steps.package.outputs.artifact_size }}) to release ${{ inputs.release_tag }}"
+          gh release upload ${{ inputs.release_tag }} ${{ steps.package.outputs.artifact_name }} --clobber
