@@ -149,4 +149,45 @@ public class WasmImports {
      */
     public static final ImportDescriptor.Function hostTimeMs = new ImportDescriptor.Function(MODULE_IO, "host_time_ms",
                     TypeUse.withResult(f64), "Host: current time in ms");
+
+    /**
+     * Component-model-compatible import descriptors for standalone WASM output.
+     * <p>
+     * These use fully-qualified module names (e.g. {@code graalvm:standalone/io@0.1.0})
+     * and kebab-case function names (e.g. {@code print-char}) as required by the
+     * WebAssembly Component Model specification.
+     * <p>
+     * Use these when targeting {@code wasm-tools component new} wrapping.
+     */
+    public static final class Component {
+        public static final String WIT_PACKAGE = "graalvm:standalone";
+        public static final String WIT_VERSION = "0.1.0";
+
+        public static final String COMPONENT_COMPAT = WIT_PACKAGE + "/compat@" + WIT_VERSION;
+        public static final String COMPONENT_IO = WIT_PACKAGE + "/io@" + WIT_VERSION;
+        public static final String COMPONENT_WASI = WIT_PACKAGE + "/wasi@" + WIT_VERSION;
+
+        // Compat math functions (names are already kebab-compatible)
+        public static final ImportDescriptor.Function F32Rem = new ImportDescriptor.Function(COMPONENT_COMPAT, "f32rem", TypeUse.forBinary(f32, f32, f32), "JVM FREM Instruction");
+        public static final ImportDescriptor.Function F64Rem = new ImportDescriptor.Function(COMPONENT_COMPAT, "f64rem", TypeUse.forBinary(f64, f64, f64), "JVM DREM Instruction");
+        public static final ImportDescriptor.Function F64Log = new ImportDescriptor.Function(COMPONENT_COMPAT, "f64log", TypeUse.forUnary(f64, f64), "Math.log");
+        public static final ImportDescriptor.Function F64Log10 = new ImportDescriptor.Function(COMPONENT_COMPAT, "f64log10", TypeUse.forUnary(f64, f64), "Math.log10");
+        public static final ImportDescriptor.Function F64Sin = new ImportDescriptor.Function(COMPONENT_COMPAT, "f64sin", TypeUse.forUnary(f64, f64), "Math.sin");
+        public static final ImportDescriptor.Function F64Cos = new ImportDescriptor.Function(COMPONENT_COMPAT, "f64cos", TypeUse.forUnary(f64, f64), "Math.cos");
+        public static final ImportDescriptor.Function F64Tan = new ImportDescriptor.Function(COMPONENT_COMPAT, "f64tan", TypeUse.forUnary(f64, f64), "Math.tan");
+        public static final ImportDescriptor.Function F64Tanh = new ImportDescriptor.Function(COMPONENT_COMPAT, "f64tanh", TypeUse.forUnary(f64, f64), "Math.tanh");
+        public static final ImportDescriptor.Function F64Exp = new ImportDescriptor.Function(COMPONENT_COMPAT, "f64exp", TypeUse.forUnary(f64, f64), "Math.exp");
+        public static final ImportDescriptor.Function F64Pow = new ImportDescriptor.Function(COMPONENT_COMPAT, "f64pow", TypeUse.forBinary(f64, f64, f64), "Math.pow");
+        public static final ImportDescriptor.Function F64Cbrt = new ImportDescriptor.Function(COMPONENT_COMPAT, "f64cbrt", TypeUse.forBinary(f64, f64, f64), "Math.cbrt");
+
+        // IO functions (kebab-case)
+        public static final ImportDescriptor.Function printChar = new ImportDescriptor.Function(COMPONENT_IO, "print-char",
+                        TypeUse.withoutResult(i32, i32), "Print single char: (fd, char_code)");
+        public static final ImportDescriptor.Function hostTimeMs = new ImportDescriptor.Function(COMPONENT_IO, "host-time-ms",
+                        TypeUse.withResult(f64), "Host: current time in ms");
+
+        // WASI (kebab-case)
+        public static final ImportDescriptor.Function procExit = new ImportDescriptor.Function(COMPONENT_WASI, "proc-exit",
+                        TypeUse.withoutResult(i32), "WASI proc_exit");
+    }
 }
