@@ -40,16 +40,18 @@ import com.oracle.svm.shared.singletons.traits.BuiltinTraits.BuildtimeAccessOnly
 import com.oracle.svm.shared.singletons.traits.BuiltinTraits.Disallowed;
 import com.oracle.svm.shared.singletons.traits.BuiltinTraits.NoLayeredCallbacks;
 import com.oracle.svm.shared.singletons.traits.SingletonTraits;
-import com.oracle.svm.shared.util.VMError;
-import com.oracle.svm.webimage.functionintrinsics.JSCallNode;
 import com.oracle.svm.webimage.platform.WebImageWasmLMPlatform;
 import com.oracle.svm.webimage.print.WebImagePrintingProvider;
 
 /**
- * Printing functionality for the Wasm backend.
+ * Printing functionality for the Wasm backend without JS interop.
  * <p>
  * Printing is done by passing a raw pointer to the start of the char array to a dedicated
- * {@link WasmPrintNode}
+ * {@link WasmPrintNode}. Flush and close are no-ops since the underlying IO imports
+ * (host_print_bytes/host_print_chars) write immediately without buffering.
+ * <p>
+ * This provider does not use any JS interop (JSCallNode), making the resulting
+ * WASM module standalone without JS host dependencies.
  */
 @AutomaticallyRegisteredImageSingleton(WebImagePrintingProvider.class)
 @Platforms(WebImageWasmLMPlatform.class)
@@ -66,19 +68,11 @@ public class WebImageWasmLMPrintingProvider extends WebImagePrintingProvider {
 
     @Override
     public void flush(Descriptor fd) {
-        switch (fd) {
-            case OUT -> JSCallNode.call(JSCallNode.PRINT_FLUSH_OUT);
-            case ERR -> JSCallNode.call(JSCallNode.PRINT_FLUSH_ERR);
-            default -> throw VMError.shouldNotReachHereAtRuntime();
-        }
+        // No-op: IO imports write immediately without buffering
     }
 
     @Override
     public void close(Descriptor fd) {
-        switch (fd) {
-            case OUT -> JSCallNode.call(JSCallNode.PRINT_CLOSE_OUT);
-            case ERR -> JSCallNode.call(JSCallNode.PRINT_CLOSE_ERR);
-            default -> throw VMError.shouldNotReachHereAtRuntime();
-        }
+        // No-op: stdout/stderr file descriptors are not closeable
     }
 }

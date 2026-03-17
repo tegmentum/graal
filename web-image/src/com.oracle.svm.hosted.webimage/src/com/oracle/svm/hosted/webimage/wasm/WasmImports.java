@@ -78,4 +78,64 @@ public class WasmImports {
 
     public static final WasmImportForeignCallDescriptor PROXY_CHAR_ARRAY = new WasmImportForeignCallDescriptor(MODULE_CONVERT, "proxyCharArray", WasmExtern.class, new Class<?>[]{char[].class},
                     "Creates a JS proxy around a char array");
+
+    /**
+     * Module name for WASI snapshot preview1 imports.
+     */
+    public static final String MODULE_WASI = "wasi_snapshot_preview1";
+
+    /**
+     * WASI fd_write: write bytes to a file descriptor via iovec.
+     * <p>
+     * Signature: {@code fd_write(fd: i32, iovs: i32, iovs_len: i32, nwritten: i32) -> i32}
+     * <p>
+     * The caller must set up a ciovec structure in linear memory at {@code iovs}:
+     * {@code { buf: i32, buf_len: i32 }}.
+     * The number of bytes written is stored at the {@code nwritten} pointer.
+     */
+    public static final ImportDescriptor.Function wasiFdWrite = new ImportDescriptor.Function(MODULE_WASI, "fd_write",
+                    TypeUse.withResult(i32, i32, i32, i32, i32), "WASI fd_write");
+
+    /**
+     * WASI proc_exit: terminate the process with an exit code.
+     * <p>
+     * Signature: {@code proc_exit(code: i32)}
+     */
+    public static final ImportDescriptor.Function wasiProcExit = new ImportDescriptor.Function(MODULE_WASI, "proc_exit",
+                    TypeUse.withoutResult(i32), "WASI proc_exit");
+
+    /**
+     * Simple host print: write raw bytes to a file descriptor.
+     * <p>
+     * Signature: {@code host_print(fd: i32, ptr: i32, len: i32)}
+     * <p>
+     * This is a simpler alternative to WASI fd_write that doesn't require iovec setup.
+     * Used by the WasmLM backend when targeting standalone WASM without JS.
+     */
+    public static final ImportDescriptor.Function hostPrintBytes = new ImportDescriptor.Function(MODULE_IO, "host_print_bytes",
+                    TypeUse.withoutResult(i32, i32, i32), "Host: print raw bytes to fd");
+
+    /**
+     * Simple host print for 2-byte chars.
+     * <p>
+     * Signature: {@code host_print_chars(fd: i32, ptr: i32, num_chars: i32)}
+     */
+    public static final ImportDescriptor.Function hostPrintChars = new ImportDescriptor.Function(MODULE_IO, "host_print_chars",
+                    TypeUse.withoutResult(i32, i32, i32), "Host: print 2-byte chars to fd");
+
+    /**
+     * Host flush: flush a file descriptor.
+     * <p>
+     * Signature: {@code host_flush(fd: i32)}
+     */
+    public static final ImportDescriptor.Function hostFlush = new ImportDescriptor.Function(MODULE_IO, "host_flush",
+                    TypeUse.withoutResult(i32), "Host: flush fd");
+
+    /**
+     * Host time: get current time in milliseconds.
+     * <p>
+     * Signature: {@code host_time_ms() -> f64}
+     */
+    public static final ImportDescriptor.Function hostTimeMs = new ImportDescriptor.Function(MODULE_IO, "host_time_ms",
+                    TypeUse.withResult(f64), "Host: current time in ms");
 }

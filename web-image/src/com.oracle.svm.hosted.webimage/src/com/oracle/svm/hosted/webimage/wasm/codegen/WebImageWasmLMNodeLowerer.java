@@ -555,46 +555,49 @@ public class WebImageWasmLMNodeLowerer extends WebImageWasmNodeLowerer {
     }
 
     /**
-     * Functions in {@link JSCallNode} which pass objects that have been adapted to work with the
-     * WasmLM backend.
-     */
-    private static final Set<JSSystemFunction> SUPPORTED_OBJECT_JS_CALLS = Set.of(JSCallNode.GEN_CALL_STACK, JSCallNode.GET_CURRENT_WORKING_DIRECTORY);
-    /**
      * Functions in {@link JSCallNode} which are not supported in the WasmLM backend.
      */
     private static final Set<JSSystemFunction> FORBIDDEN_JS_CALLS = Set.of(MEM_MALLOC, MEM_CALLOC, MEM_REALLOC, MEM_FREE);
 
+    /**
+     * Lowers JSCallNode to host imports instead of JS interop.
+     * <p>
+     * This replaces the JS "interop" module imports with standalone host IO imports,
+     * allowing the resulting WASM module to run without a JS host environment.
+     * <p>
+     * Known functions are routed to their WASI/host equivalents. Unknown or
+     * unsupported functions are replaced with stubs (no-ops or traps).
+     */
     private Instruction lowerJSCall(JSCallNode n) {
         JSSystemFunction func = n.getFunctionDefinition();
+        String funcName = func.getFunctionName();
 
-        boolean passesObject = false;
-
-        for (ValueNode node : n.getArguments()) {
-            if (node.stamp(NodeView.DEFAULT).isPointerStamp()) {
-                passesObject = true;
-                break;
-            }
-        }
-
-        if (n.stamp(NodeView.DEFAULT).isPointerStamp()) {
-            passesObject = true;
-        }
-
-        if (passesObject && !SUPPORTED_OBJECT_JS_CALLS.contains(func)) {
-            // TODO GR-42437 Passing objects is not yet supported. Consider failing if this happen
-            // and make sure no JSCallNode passing objects is created in the WASM backend.
-            return getStub(n);
-        }
-
-        // TODO GR-42437 Support all calls
         if (FORBIDDEN_JS_CALLS.contains(func)) {
             return getStub(n);
         }
 
-        Instructions params = new Instructions();
-        n.getArguments().forEach(param -> params.add(lowerExpression(param)));
-
-        return new Call(masm().wasmProviders.getJSCounterparts().idForJSFunction(masm().wasmProviders, func), params);
+        // Route known JS functions to standalone host imports instead of JS interop.
+        // This eliminates the "interop" module imports from the generated WASM.
+        return switch (funcName) {
+            // Flush/close: no-op (WasmPrintNode writes are unbuffered)
+            case "stdoutWriter.flush", "stderrWriter.flush",
+                 "stdoutWriter.close", "stderrWriter.close" ->
+                new Nop();
+            // Time: route to host_time_ms import
+            case "performance.now", "Date.now" ->
+                new Call(masm().idFactory.forFunctionImport(WasmImports.hostTimeMs));
+            // Exit: route to WASI proc_exit
+            case "runtime.setExitCode" -> {
+                Instructions params = new Instructions();
+                n.getArguments().forEach(param -> params.add(lowerExpression(param)));
+                yield new Call(masm().idFactory.forFunctionImport(WasmImports.wasiProcExit), params);
+            }
+            // Print chars via externref: stub (real printing goes through WasmPrintNode)
+            case "stdoutWriter.printChars", "stderrWriter.printChars" ->
+                new Nop();
+            // Stack traces, logging, CWD: stub as no-op
+            default -> getStub(n);
+        };
     }
 
     private Instruction lowerJSBody(JSBody n) {
